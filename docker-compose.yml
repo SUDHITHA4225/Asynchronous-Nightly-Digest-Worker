@@ -1,0 +1,71 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-digest}
+      POSTGRES_USER: ${POSTGRES_USER:-digest}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-digest_example_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-digest} -d ${POSTGRES_DB:-digest}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    command: ["npm", "start"]
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3000}
+      DATABASE_URL: ${DATABASE_URL:-postgres://digest:digest_example_password@db:5432/digest}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PROCESSING_DELAY_MS: ${PROCESSING_DELAY_MS:-2000}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  worker:
+    build: .
+    command: ["npm", "run", "worker"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-postgres://digest:digest_example_password@db:5432/digest}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PROCESSING_DELAY_MS: ${PROCESSING_DELAY_MS:-2000}
+      SCHEDULE_CRON: ${SCHEDULE_CRON:-0 0 * * *}
+      SCHEDULE_TIMEZONE: ${SCHEDULE_TIMEZONE:-UTC}
+      WORKER_HEALTH_PORT: ${WORKER_HEALTH_PORT:-3001}
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  postgres_data:

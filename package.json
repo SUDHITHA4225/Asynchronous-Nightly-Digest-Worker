@@ -1,0 +1,19 @@
+{
+  "name": "asynchronous-nightly-digest-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Asynchronous nightly digest processing with lifecycle activity logs",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "worker": "node src/worker.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "bullmq": "^5.34.10",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "node-cron": "^3.0.3",
+    "pg": "^8.13.1"
+  }
+}
